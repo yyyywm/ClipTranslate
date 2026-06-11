@@ -1,12 +1,17 @@
-
+# IDE
 .idea/
 
+# Python cache
+__pycache__/
+
+# Build artifacts
 build/
-
-resource/config.ini
-
 dist/
 
-interface.spec
+# User config (contains sensitive credentials)
+resource/config.ini
 
-__pycache__/
+# Development documentation
+docs/
+
+resource/app.log
