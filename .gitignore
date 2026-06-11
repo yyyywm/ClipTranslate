@@ -10,3 +10,6 @@ dist/
 
 # User config (contains sensitive credentials)
 resource/config.ini
+
+# Development documentation
+docs/
