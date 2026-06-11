@@ -10,7 +10,7 @@ import pystray
 from PIL import Image
 from pystray import MenuItem as item
 
-from config import ConfigManager
+from config import ConfigManager, _base_dir
 from notifier import Notifier
 from translator import ClipboardTranslator, TranslateConfig
 
@@ -57,7 +57,7 @@ class ClipTranslateApp:
         self._app.title("ClipTranslate")
         self._app.geometry(f"{self.WINDOW_WIDTH}x{self.WINDOW_HEIGHT}")
 
-        icon_path = Path(__file__).parent / self.ICON_PATH
+        icon_path = _base_dir() / self.ICON_PATH
         if icon_path.exists():
             try:
                 self._app.iconbitmap(str(icon_path))
@@ -190,7 +190,7 @@ class ClipTranslateApp:
 
     def _create_tray_icon(self) -> None:
         """Create and run the system tray icon in a daemon thread."""
-        tray_icon_path = Path(__file__).parent / self.TRAY_ICON_PATH
+        tray_icon_path = _base_dir() / self.TRAY_ICON_PATH
         if not tray_icon_path.exists():
             logger.warning("Tray icon not found: %s", tray_icon_path)
             return

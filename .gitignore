@@ -1,14 +1,12 @@
-
+# IDE
 .idea/
 
-build/
-
-resource/config.ini
-
-dist/
-
-interface.spec
-
+# Python cache
 __pycache__/
 
-ClipTranslate.spec
+# Build artifacts
+build/
+dist/
+
+# User config (contains sensitive credentials)
+resource/config.ini

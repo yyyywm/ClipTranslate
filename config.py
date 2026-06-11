@@ -2,10 +2,21 @@
 
 import configparser
 import logging
+import sys
 from pathlib import Path
 from typing import Dict, List, Optional, Union
 
 logger = logging.getLogger(__name__)
+
+
+def _base_dir() -> Path:
+    """Return the application base directory.
+
+    Works both in development and when bundled by PyInstaller.
+    """
+    if getattr(sys, "_MEIPASS", None):
+        return Path(sys._MEIPASS)
+    return Path(__file__).parent
 
 
 class ConfigManager:
@@ -30,7 +41,7 @@ class ConfigManager:
         """
         if config_path is None:
             # Determine project root relative to this file
-            self._config_file = Path(__file__).parent / "resource" / "config.ini"
+            self._config_file = _base_dir() / "resource" / "config.ini"
         else:
             self._config_file = Path(config_path)
 

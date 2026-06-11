@@ -6,6 +6,8 @@ from typing import Optional
 
 from windows_toasts import Toast, ToastDisplayImage, WindowsToaster
 
+from config import _base_dir
+
 logger = logging.getLogger(__name__)
 
 
@@ -24,7 +26,7 @@ class Notifier:
         """
         self._toaster = WindowsToaster(self.APP_NAME)
         if icon_path is None:
-            self._icon_path = Path(__file__).parent / self.DEFAULT_ICON
+            self._icon_path = _base_dir() / self.DEFAULT_ICON
         else:
             self._icon_path = Path(icon_path)
 
