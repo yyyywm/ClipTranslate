@@ -13,3 +13,5 @@ resource/config.ini
 
 # Development documentation
 docs/
+
+resource/app.log

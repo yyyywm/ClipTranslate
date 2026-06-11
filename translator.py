@@ -144,7 +144,11 @@ class ClipboardTranslator:
             value: New hotkey combination string (e.g. 'ctrl+i').
         """
         self._hotkey = value
-        keyboard.remove_all_hotkeys()
+        try:
+            keyboard.remove_all_hotkeys()
+        except AttributeError:
+            # Listener may not be initialized yet (e.g. first hotkey set).
+            pass
         if value:
             try:
                 keyboard.add_hotkey(value, self._execute)
@@ -183,7 +187,10 @@ class ClipboardTranslator:
 
     def stop(self) -> None:
         """Stop listening for hotkeys."""
-        keyboard.remove_all_hotkeys()
+        try:
+            keyboard.remove_all_hotkeys()
+        except AttributeError:
+            pass
         logger.info("Hotkey listener stopped")
 
     def _copy(self) -> None:
