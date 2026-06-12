@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - master  # 当推送到 main 分支时触发构建
+      - develop
   workflow_dispatch:  # 允许手动触发该 workflow
 
 jobs:
@@ -37,6 +38,7 @@ jobs:
         path: dist/  # 上传打包后的文件夹作为构建工件
 
   release:
+    if: github.ref == 'refs/heads/master' # 只有当 master 分支更新时才 release
     runs-on: ubuntu-latest
     needs: build  # 需要 build job 完成后才执行
     steps:
