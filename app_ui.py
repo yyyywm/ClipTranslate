@@ -46,7 +46,18 @@ class ClipTranslateApp:
             target_lang=self._settings.get("language", "en"),
         )
         translator = ClipboardTranslator(config=config, notifier=self._notifier.notify)
-        translator.hotkey = self._settings.get("shortcut", "ctrl+i")
+
+        shortcut = self._settings.get("shortcut", "ctrl+i")
+        translator.hotkey = shortcut
+        # If the loaded value was rejected as corrupted, fall back to default
+        # and tell the user to re-set the shortcut.
+        if not translator.hotkey:
+            translator.hotkey = "ctrl+i"
+            self._hotkey_var.set("ctrl+i")
+            self._show_popup(
+                "快捷键配置损坏，已恢复默认(ctrl+i)，请重新设置",
+                duration=3000,
+            )
         return translator
 
     def _build_ui(self) -> None:
@@ -126,13 +137,41 @@ class ClipTranslateApp:
         self._result_label.pack(pady=10)
 
     def _on_set_hotkey(self) -> None:
-        """Capture a new hotkey from keyboard input."""
+        """Capture a new hotkey from keyboard input.
+
+        ``keyboard.read_hotkey()`` builds its return value from the global
+        ``keyboard._pressed_events`` dict.  That dict is shared across the
+        whole process and gets polluted by *any* key events that the
+        ``keyboard`` WH_KEYBOARD_LL hook receives -- including the synthetic
+        Ctrl+C / Ctrl+V injected by ``pynput.Controller`` inside
+        ``_execute``.  Once a ghost key (e.g. ``1`` or ``f22``) lands in
+        ``_pressed_events`` it never gets cleaned up, so every subsequent
+        ``read_hotkey()`` call returns ``ctrl+1+i`` etc.
+
+        To break the cycle we: (1) clear ``_pressed_events`` so only the
+        user's actual keypress is captured, (2) call ``unhook_all()`` so
+        no new synthetic events can poison the dict while we wait, and
+        (3) remove the hotkey callback so ``_execute`` cannot re-enter.
+        """
         import keyboard as kb
 
-        # Unbind the old hotkey while capturing the new one so pressing the
-        # intended shortcut doesn't fire the previous _execute callback.
         old_hotkey = self._translator.hotkey
+
+        # (1) Tear down the active hotkey binding so _execute cannot run
+        #     while we are capturing.
         kb.remove_all_hotkeys()
+
+        # (2) Remove the WH_KEYBOARD_LL listener entirely.  While the hook
+        #     is gone, pynput's synthetic Ctrl+C / Ctrl+V events cannot be
+        #     added to _pressed_events.
+        kb.unhook_all()
+
+        # (3) Clear any ghost keys left over from previous _execute runs.
+        #     read_hotkey() reads from _pressed_events to build the
+        #     returned string; residual entries (e.g. "1", "c", "f22")
+        #     would otherwise appear in the captured hotkey.
+        if hasattr(kb, "_pressed_events"):
+            kb._pressed_events.clear()
 
         self._show_popup("请按下新快捷键...", duration=1500)
         try:

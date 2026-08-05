@@ -131,6 +131,80 @@ class ClipboardTranslator:
         self._running: bool = True
         self._lock = threading.Lock()
 
+    @staticmethod
+    def _is_hotkey_corrupted(value: str) -> bool:
+        """Detect a hotkey value that was polluted during capture.
+
+        A polluted value typically has non-modifier keys wedged between
+        the modifiers and the trigger key (e.g. ``ctrl+1+i`` where ``1``
+        is neither a modifier nor the intended hotkey), or contains
+        obviously synthetic function-key tokens like ``f22``.
+
+        Args:
+            value: The hotkey string to validate.
+
+        Returns:
+            True if the value looks corrupted and should be rejected.
+        """
+        KNOWN_MODIFIERS = {
+            "ctrl", "alt", "shift", "win",
+            "ctrl_l", "ctrl_r", "alt_l", "alt_r",
+            "shift_l", "shift_r",
+            "num_lock", "caps_lock", "scroll_lock",
+        }
+
+        if not value:
+            return True
+
+        parts = value.lower().split("+")
+
+        # Hotkeys are at most 3 keys: modifier + [modifier] + key.
+        # A 4+ part string is almost certainly polluted.
+        if len(parts) > 3:
+            return True
+
+        for p in parts:
+            if not p:
+                continue
+            if p in KNOWN_MODIFIERS:
+                continue
+            # Allowed non-modifier: a printable key (letter, digit, f-key).
+            if p.isalnum() and len(p) <= 4:
+                # Function keys beyond f24 never come from a real key press.
+                if p.startswith("f") and len(p) > 2 and p[1:].isdigit():
+                    if int(p[1:]) > 24:
+                        return True
+                continue
+            # If the part has special characters (e.g. "space", "enter")
+            # it's fine; anything else is suspicious.
+            if p in {
+                "space", "enter", "esc", "backspace", "tab",
+                "delete", "insert", "home", "end", "pgup", "pgdn",
+                "up", "down", "left", "right", "print",
+                "pause", "menu", "lctrl", "rctrl", "lalt", "ralt",
+                "lshift", "rshift", "lwin", "rwin",
+            }:
+                continue
+            # Anything else is suspicious (e.g. an unknown synthetic token).
+            return True
+
+        # Additional sanity check: if there are 3 parts, at most one should be
+        # a non-modifier "key".  e.g. "ctrl+1+i" -- two non-modifier tokens,
+        # polluted.
+        if len(parts) == 3:
+            non_mod = [p for p in parts if p not in KNOWN_MODIFIERS]
+            if len(non_mod) > 1:
+                return True
+
+        # A valid hotkey must contain at least one actual key (not just
+        # modifiers).  "ctrl+shift" / "ctrl+alt+shift" have no trigger and
+        # are therefore invalid.
+        non_mod = [p for p in parts if p not in KNOWN_MODIFIERS]
+        if not non_mod:
+            return True
+
+        return False
+
     @property
     def hotkey(self) -> str:
         """Return the currently bound hotkey."""
@@ -140,9 +214,15 @@ class ClipboardTranslator:
     def hotkey(self, value: str) -> None:
         """Set a new hotkey and re-bind it.
 
+        Corrupted values (polluted during capture) are rejected and the
+        old binding is kept so the user never gets a broken hotkey.
+
         Args:
             value: New hotkey combination string (e.g. 'ctrl+i').
         """
+        if value and self._is_hotkey_corrupted(value):
+            logger.warning("Rejected corrupted hotkey value: %s", value)
+            return
         self._hotkey = value
         try:
             keyboard.remove_all_hotkeys()
@@ -155,6 +235,7 @@ class ClipboardTranslator:
                 logger.info("Hotkey bound: %s", value)
             except Exception as exc:
                 logger.error("Failed to bind hotkey '%s': %s", value, exc)
+                self._hotkey = ""
                 if self._notifier:
                     self._notifier("快捷键绑定失败")
 
