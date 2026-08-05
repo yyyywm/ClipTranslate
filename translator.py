@@ -364,6 +364,13 @@ class ClipboardTranslator:
                 self._notifier("翻译过程中发生错误")
         finally:
             self._lock.release()
+            # Clear any key events that pynput.Controller's simulated
+            # Ctrl+C / Ctrl+V left behind in keyboard._pressed_events.
+            # Those ghost entries never expire on their own and would make
+            # read_hotkey() / internal hotkey matching see keys the user
+            # never touched (e.g. '1' appearing as if held down).
+            if hasattr(keyboard, "_pressed_events"):
+                keyboard._pressed_events.clear()
             # Re-bind the hotkey now that simulated key events are done.
             self._hotkey = saved_hotkey
             if saved_hotkey:
