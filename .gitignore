@@ -15,3 +15,5 @@ resource/config.ini
 docs/
 
 resource/app.log
+
+.vscode/

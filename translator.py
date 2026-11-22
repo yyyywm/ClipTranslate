@@ -55,7 +55,7 @@ class TranslationEngine:
     """LLM translation engine speaking the OpenAI-compatible chat API."""
 
     REQUEST_TIMEOUT: float = 60.0
-    TEMPERATURE: float = 0.3
+    TEMPERATURE: float = 1
 
     def __init__(self, config: TranslateConfig) -> None:
         """Initialize with translation configuration.
@@ -182,7 +182,7 @@ class TranslationEngine:
         url = self._config.base_url.rstrip("/") + "/chat/completions"
         payload = {
             "model": self._config.model,
-            "temperature": 0,
+            "temperature": 1,
             "max_tokens": 1,
             "messages": [{"role": "user", "content": "hi"}],
         }
