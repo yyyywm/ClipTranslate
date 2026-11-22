@@ -130,6 +130,12 @@ class ClipboardTranslator:
         self._hotkey: str = ""
         self._running: bool = True
         self._lock = threading.Lock()
+        logger.debug(
+            "ClipboardTranslator init - keyboard state: "
+            "_pressed_events=%s, _logically_pressed_keys=%s",
+            list(keyboard._pressed_events.keys()),
+            list(keyboard._logically_pressed_keys),
+        )
 
     @staticmethod
     def _is_hotkey_corrupted(value: str) -> bool:
@@ -322,12 +328,28 @@ class ClipboardTranslator:
             logger.debug("Translation already in progress, skipping")
             return
 
+        logger.debug(
+            "Pre-_execute keyboard state: _pressed_events=%s, "
+            "_logically_pressed_keys=%s",
+            list(keyboard._pressed_events.keys()),
+            list(keyboard._logically_pressed_keys),
+        )
+
         # Save and clear the hotkey binding so simulated key events during
         # copy/paste cannot re-enter this callback.
         saved_hotkey = self._hotkey
         self._hotkey = ""
         try:
             keyboard.remove_all_hotkeys()
+            # Also remove all hook handlers so pynput's synthetic Ctrl+C/Ctrl+V
+            # cannot pollute keyboard._pressed_events while we simulate keys.
+            keyboard.unhook_all()
+            logger.debug(
+                "After remove+unhook: _pressed_events=%s, "
+                "_logically_pressed_keys=%s",
+                list(keyboard._pressed_events.keys()),
+                list(keyboard._logically_pressed_keys),
+            )
         except AttributeError:
             pass
 
@@ -364,17 +386,40 @@ class ClipboardTranslator:
                 self._notifier("翻译过程中发生错误")
         finally:
             self._lock.release()
-            # Clear any key events that pynput.Controller's simulated
-            # Ctrl+C / Ctrl+V left behind in keyboard._pressed_events.
-            # Those ghost entries never expire on their own and would make
-            # read_hotkey() / internal hotkey matching see keys the user
-            # never touched (e.g. '1' appearing as if held down).
+            # Clean up the keyboard library's internal state BEFORE
+            # re-binding the hotkey.  keyboard.add_hotkey() immediately
+            # inspects _logically_pressed_keys / _pressed_events at bind
+            # time; if the ctrl+i that originally triggered _execute is
+            # still "logically pressed", add_hotkey will fire _execute
+            # again on the spot — producing the infinite re-entry loop.
+            # Order MUST be: clear state  →  add_hotkey.
             if hasattr(keyboard, "_pressed_events"):
                 keyboard._pressed_events.clear()
-            # Re-bind the hotkey now that simulated key events are done.
+            if hasattr(keyboard, "_logically_pressed_keys"):
+                keyboard._logically_pressed_keys.clear()
+            logger.debug(
+                "Post-_execute keyboard state: _pressed_events=%s, "
+                "_logically_pressed_keys=%s",
+                list(keyboard._pressed_events.keys()),
+                list(keyboard._logically_pressed_keys),
+            )
+
+            # Re-bind the hotkey AFTER a short delay so that the user's
+            # physical key-release events have time to clear from the
+            # keyboard library's state.  If add_hotkey() is called while
+            # the triggering key combo is still logically pressed, it
+            # will immediately re-fire _execute — creating an infinite
+            # loop.  Delaying ~150 ms lets the OS process the key-up
+            # events first.
             self._hotkey = saved_hotkey
             if saved_hotkey:
-                try:
-                    keyboard.add_hotkey(saved_hotkey, self._execute)
-                except Exception as exc:
-                    logger.error("Failed to re-bind hotkey '%s': %s", saved_hotkey, exc)
+                def _rebind():
+                    try:
+                        keyboard.add_hotkey(saved_hotkey, self._execute)
+                        logger.debug("Hotkey re-bound: %s", saved_hotkey)
+                    except Exception as exc:
+                        logger.error(
+                            "Failed to re-bind hotkey '%s': %s", saved_hotkey, exc
+                        )
+
+                threading.Timer(0.15, _rebind).start()
