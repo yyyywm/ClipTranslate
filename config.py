@@ -37,11 +37,13 @@ class ConfigManager:
     """Manages reading, writing, and validation of the application config."""
 
     DEFAULT_CONFIG: Dict[str, str] = {
-        "secretid": "",
-        "secretkey": "",
-        "projectid": "",
-        "shortcut": "ctrl+i",
+        "provider": "DeepSeek",
+        "base_url": "https://api.deepseek.com/v1",
+        "api_key": "",
+        "model": "deepseek-chat",
         "language": "en",
+        "prompt": "",
+        "shortcut": "ctrl+i",
     }
 
     SUPPORTED_LANGUAGES: List[str] = ["en", "zh", "ja", "ko"]
@@ -103,6 +105,20 @@ class ConfigManager:
             config.write(f)
         logger.info("Config saved to %s", self._config_file)
 
+    def update_partial(self, **fields: str) -> None:
+        """Merge specific keys into the persisted config without a full rewrite.
+
+        Reads current on-disk values first, so UI drafts that haven't been
+        saved yet are not persisted. Used for live-applied fields like the
+        target language, which take effect immediately without a save step.
+
+        Args:
+            **fields: Key-value pairs to merge into the persisted config.
+        """
+        current = self.load()
+        current.update(fields)
+        self.save(current)
+
     def validate(self, data: Dict[str, str]) -> List[str]:
         """Validate configuration values.
 
@@ -113,12 +129,12 @@ class ConfigManager:
             List of validation error messages (empty if valid).
         """
         errors: List[str] = []
-        if not data.get("secretid", "").strip():
-            errors.append("SecretId is required")
-        if not data.get("secretkey", "").strip():
-            errors.append("SecretKey is required")
-        if not data.get("projectid", "").strip():
-            errors.append("ProjectId is required")
+        if not data.get("base_url", "").strip():
+            errors.append("接口地址 (Base URL) is required")
+        if not data.get("api_key", "").strip():
+            errors.append("API Key is required")
+        if not data.get("model", "").strip():
+            errors.append("模型名 (Model) is required")
         if data.get("language", "en") not in self.SUPPORTED_LANGUAGES:
             errors.append(
                 f"Unsupported language '{data.get('language')}'. "
