@@ -26,11 +26,16 @@ python ClipTranslate.py
 
 #### 应用打包
 
-详细请看**pyinstaller**的使用教程，需要注意的是，打包并没有将资源文件打包进去，需要自行把resource文件夹复制到打包好的文件夹里。
+在 Windows 上安装项目依赖后，从项目根目录打开 PowerShell 并运行以下命令。
 
-```bash
-pyinstaller --noconfirm --windowed --icon=resource\logo.ico --noconsole ClipTranslate.py
+```powershell
+python -m pip install "pyinstaller>=6"
+python -m PyInstaller --noconfirm --windowed --icon "resource\logo.ico" --add-data "resource\logo.ico:resource" --add-data "resource\ui.png:resource" ClipTranslate.py
 ```
+
+`--icon` 设置 EXE 的图标。两项 `--add-data` 将窗口、托盘和通知使用的图标放到包内的 `resource` 目录。打包完成后，运行 `dist\ClipTranslate\ClipTranslate.exe`。发布时请分发整个 `dist\ClipTranslate` 目录，保留其中的 `_internal` 目录。
+
+`--noconfirm` 会替换现有的 `dist\ClipTranslate`。如果需要保留旧 EXE 的设置，请先备份 `dist\ClipTranslate\resource\config.ini` 到输出目录之外，打包完成后再恢复。源码目录的 `resource\config.ini` 和 EXE 的配置分别保存。配置文件可能含有 API Key，请勿将其随发布包分发。
 
 ### 配置参数获取方法如下👇
 
